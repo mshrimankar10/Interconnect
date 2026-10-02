@@ -17,10 +17,11 @@ Connection:
   example:
     name: providers/my-provider/environments/my-environment/interconnects/my-interconnect/connections/my-connection
     adminState: ""
-    activationKey: activationKey
     verificationState: ""
     bandwidthMbps: 0
     deferProvisioning: false
+    sourceData:
+      encodedKey: <Base64 Activation Key>
   properties:
     name:
       description: |-
@@ -29,7 +30,11 @@ Connection:
         Format: providers/{provider}/environments/{environment}/interconnects/{interconnect}/connections/{connection}
       type: string
     activationKey:
-      description: Identifier. A activation key associated with the connection.
+      deprecated: true
+      description: |-
+        DEPRECATED - Should use sourceData instead.
+        If both sourceData and activationKey are present, sourceData must be used.
+        The activation key associated with the connection.
       type: string
     bandwidthMbps:
       description: |-
@@ -55,6 +60,20 @@ Connection:
         receiver. Note, the receiver may refuse to accept the provisioning responsiblity
         and reject the request with a 400 error code.
       type: boolean
+    sourceData:
+      description: |-
+        The source that should be consulted/confirmed as part of the creation request.
+      oneOf:
+      - $ref: "#/EncodedKey"
+      - $ref: "#/SourceConnectionName"
+      type: object
+    connectionType:
+      allOf:
+      - $ref: "common.yaml#/ConnectionType"
+      description: |-
+        Optional. The type of connection being created. Defaults to
+        CONNECTION_TYPE_STANDARD if not specified.
+      default: CONNECTION_TYPE_STANDARD
   type: object
   
 FeatureGuidance:
@@ -179,13 +198,32 @@ L3BaseGuidance:
       type: array
     maxReceivedBgpRoutePrefixes:
       description: |-
-        Maximum number of BGP route prefixes accepted by the connection.
+        Required. Maximum number of IPv4 BGP route prefixes accepted by the
+        connection.
 
         While not negotiated between providers, providers must be aware that if
         more BGP route prefixes are announced, protocol behavior will be
         undefined.
       format: int32
       type: integer
+    maxReceivedBgpRoutePrefixesIpv6:
+      description: |-
+        Optional. Maximum number of IPv6 BGP route prefixes accepted by the
+        connection.
+
+        While not negotiated between providers, providers must be aware that if
+        more BGP route prefixes are announced, protocol behavior will be
+        undefined.
+
+        If this field is omitted, the value of maxReceivedBgpRoutePrefixes is
+        also used as the IPv6 value.
+      format: int32
+      type: integer
+  required:
+  - asnRanges
+  - vlanRanges
+  - mtuRanges
+  - maxReceivedBgpRoutePrefixes
   type: object
 
 ASNRange:
@@ -193,10 +231,16 @@ ASNRange:
   properties:
     start:
       description: First ASN (inclusive).
-      type: uint32
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 4294967295
     stop:
       description: Last ASN (inclusive).
-      type: uint32
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 4294967295
   type: object
 
 SubnetGuidance:
@@ -311,7 +355,6 @@ GenerateFeatureGuidanceResponse:
         provisioned on.
       items:
         $ref: "#/FeatureGuidance"
-      readOnly: true
       type: array
   type: object
 
@@ -319,4 +362,22 @@ NotifyConnectionStatusRequest:
   description: |-
     A notification from a remote provider that a connection's status has been
     updated.
+  type: object
+
+EncodedKey:
+  description: |-
+    Base64 Encoded ActivationKey
+  required: [encodedKey]
+  properties:
+    encodedKey:
+      type: string
+  type: object
+
+SourceConnectionName:
+  description: |-
+    The name of the source connection.
+  required: [sourceConnectionName]
+  properties:
+    sourceConnectionName:
+      type: string
   type: object
